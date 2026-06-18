@@ -1,21 +1,18 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import RegisterSW from "./register-sw";
+import AppNav from "@/components/AppNav";
+import OnboardingModal from "@/components/OnboardingModal";
+import { ClerkProvider } from "@clerk/nextjs";
+import { authEnabled } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: "DawaiSathi — Read your medicines from a photo",
   description:
-    "Snap a photo of a prescription or medicine strip and get every medicine with its dosage frequency. Review and fix anything the AI gets wrong before you trust it.",
+    "Snap a photo of a prescription or medicine strip and get every medicine with its dosage frequency. Review, fix, and set reminders. Patient & family accounts.",
   manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "DawaiSathi",
-  },
-  icons: {
-    icon: "/icons/icon-192.png",
-    apple: "/icons/icon-192.png",
-  },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "DawaiSathi" },
+  icons: { icon: "/icons/icon-192.png", apple: "/icons/icon-192.png" },
 };
 
 export const viewport: Viewport = {
@@ -24,15 +21,21 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
+  const tree = (
     <html lang="en">
       <body>
-        {children}
+        <OnboardingModal />
+        <div className="app-shell">{children}</div>
+        <AppNav />
         <RegisterSW />
       </body>
     </html>
   );
+
+  // Only mount ClerkProvider when keys exist, so the app builds/runs without them.
+  return authEnabled ? <ClerkProvider>{tree}</ClerkProvider> : tree;
 }

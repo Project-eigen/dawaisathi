@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { saveScanToReminders } from "@/lib/saveScan";
 
 type Confidence = "high" | "medium" | "low";
 
@@ -45,6 +47,9 @@ export default function Home() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+
+  const [saving, setSaving] = useState(false);
+  const router = useRouter();
 
   const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -130,6 +135,32 @@ export default function Home() {
       alert("Copied your reviewed list to the clipboard.");
     } catch {
       alert("Could not copy automatically. Select the text manually.");
+    }
+  };
+
+  const saveToReminders = async () => {
+    const valid = medicines.filter((m) => m.name.trim());
+    if (valid.length === 0) {
+      alert("Add at least one medicine first.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const where = await saveScanToReminders(
+        valid.map((m) => ({
+          name: m.name,
+          strength: m.strength,
+          frequency: m.frequency,
+          timing: m.timing,
+          notes: m.notes,
+        }))
+      );
+      router.push("/reminders");
+      if (where === "local") {
+        // Reminders tab will show them in on-device mode.
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -333,7 +364,10 @@ export default function Home() {
             <button className="btn-ghost" onClick={copyList}>
               Copy list
             </button>
-            <button className="btn-primary" onClick={reset}>
+            <button className="btn-primary" onClick={saveToReminders} disabled={saving}>
+              {saving ? "Saving…" : "⏰ Save to Reminders"}
+            </button>
+            <button className="btn-ghost" onClick={reset}>
               Scan another
             </button>
           </div>
