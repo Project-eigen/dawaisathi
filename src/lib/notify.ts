@@ -9,6 +9,7 @@ export type Reminder = {
   times: string[]; // "HH:MM" 24h
   timing?: string;
   notes?: string;
+  tz?: string; // IANA timezone, e.g. "Asia/Kolkata" — used by the server cron
   active: boolean;
 };
 
@@ -19,6 +20,54 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
     return await Notification.requestPermission();
   } catch {
     return "denied";
+  }
+}
+
+// This device's timezone, attached to reminders so the cron knows when "08:00"
+// actually is for this user.
+export function deviceTz(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
+function urlBase64ToUint8Array(base64: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(b64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+// Registers this browser for Web Push and stores the subscription server-side,
+// so reminders can fire even when the app/tab is closed (delivered by the cron).
+// No-op (returns false) when push isn't configured or the user isn't signed in.
+export async function subscribeToPush(): Promise<boolean> {
+  const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  if (!key) return false;
+  if (typeof window === "undefined") return false;
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const existing = await reg.pushManager.getSubscription();
+    const sub =
+      existing ||
+      (await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(key),
+      }));
+    const json = sub.toJSON();
+    const res = await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: sub.endpoint, keys: json.keys }),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 

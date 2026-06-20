@@ -22,38 +22,37 @@ function uid() {
 }
 
 /**
- * Reminders adapter:
- *  - When signed in + Neon configured -> cloud (shared with family).
- *  - Otherwise -> on-device localStorage (still drives notifications).
+ * Reminders adapter. The server identifies the caller by Clerk login OR a guest
+ * cookie, so we don't need to know "am I signed in?" — we just probe the API:
+ *  - API answers (200)      -> cloud (shared, synced, push-capable)
+ *  - DB not configured (503)-> on-device localStorage
  *
  * `patientId` lets a family member load a specific patient's list.
  */
-export function useReminders(opts: { signedIn: boolean; patientId?: string }) {
-  const { signedIn, patientId } = opts;
+export function useReminders(opts: { patientId?: string }) {
+  const { patientId } = opts;
   const [mode, setMode] = useState<Mode>("loading");
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [dbMissing, setDbMissing] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (signedIn) {
-      try {
-        const url = patientId ? `/api/reminders?patientId=${patientId}` : "/api/reminders";
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          setReminders(data.reminders || []);
-          setMode("cloud");
-          setDbMissing(false);
-          return;
-        }
-        if (res.status === 503) setDbMissing(true);
-      } catch {
-        /* fall back to local */
+    try {
+      const url = patientId ? `/api/reminders?patientId=${patientId}` : "/api/reminders";
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setReminders(data.reminders || []);
+        setMode("cloud");
+        setDbMissing(false);
+        return;
       }
+      if (res.status === 503) setDbMissing(true);
+    } catch {
+      /* fall back to local */
     }
     setReminders(loadLocal());
     setMode("local");
-  }, [signedIn, patientId]);
+  }, [patientId]);
 
   useEffect(() => {
     refresh();

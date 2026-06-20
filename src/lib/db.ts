@@ -35,11 +35,14 @@ export async function ensureSchema() {
       times       text[] NOT NULL DEFAULT '{}',
       timing      text DEFAULT '',
       notes       text DEFAULT '',
+      tz          text NOT NULL DEFAULT 'UTC',
       active      boolean NOT NULL DEFAULT true,
       created_by  text,
       created_at  timestamptz NOT NULL DEFAULT now()
     )
   `;
+  // For DBs created before the cron/push feature: add the column if missing.
+  await sql`ALTER TABLE reminders ADD COLUMN IF NOT EXISTS tz text NOT NULL DEFAULT 'UTC'`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS caregiver_links (
@@ -48,6 +51,28 @@ export async function ensureSchema() {
       patient_id  text NOT NULL,
       created_at  timestamptz NOT NULL DEFAULT now(),
       UNIQUE (family_id, patient_id)
+    )
+  `;
+
+  // Web Push endpoints a user has registered (one row per browser/device).
+  await sql`
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      endpoint   text PRIMARY KEY,
+      user_id    text NOT NULL,
+      p256dh     text NOT NULL,
+      auth       text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  // Dedupe log so a reminder fires at most once per minute, even if the cron
+  // hits the endpoint several times. Pruned to the last couple of days.
+  await sql`
+    CREATE TABLE IF NOT EXISTS reminder_fires (
+      reminder_id uuid NOT NULL,
+      fire_key    text NOT NULL,
+      created_at  timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (reminder_id, fire_key)
     )
   `;
 

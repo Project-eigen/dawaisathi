@@ -1,10 +1,7 @@
-"use client";
+import RemindersScreen from "@/components/RemindersScreen";
 
-import { authEnabled } from "@/lib/config";
-import RemindersView from "@/components/RemindersView";
-import AuthedReminders from "@/components/AuthedReminders";
-
+// Works for everyone: signed-in users and cookie-identified guests both get
+// cloud reminders when a database is connected; otherwise on-device local mode.
 export default function RemindersPage() {
-  // With Clerk configured we can sync/share; otherwise on-device local reminders.
-  return authEnabled ? <AuthedReminders /> : <RemindersView signedIn={false} />;
+  return <RemindersScreen />;
 }

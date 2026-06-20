@@ -3,6 +3,7 @@ import "./globals.css";
 import RegisterSW from "./register-sw";
 import AppNav from "@/components/AppNav";
 import OnboardingModal from "@/components/OnboardingModal";
+import SignInGate from "@/components/SignInGate";
 import { ClerkProvider } from "@clerk/nextjs";
 import { authEnabled } from "@/lib/config";
 
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const tree = (
     <html lang="en">
       <body>
+        {authEnabled && <SignInGate />}
         <OnboardingModal />
         <div className="app-shell">{children}</div>
         <AppNav />

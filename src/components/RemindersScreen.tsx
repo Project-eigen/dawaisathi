@@ -1,20 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import RemindersView from "./RemindersView";
 
 type CaringFor = { patientId: string; name: string | null; code: string };
 
-export default function AuthedReminders() {
-  const { isLoaded, isSignedIn } = useUser();
+// Picks the right reminders list for the current actor (Clerk user OR guest):
+// a patient sees their own; a family member sees the patient they're caring for.
+// Falls back to RemindersView's local mode when there's no database.
+export default function RemindersScreen() {
+  const [ready, setReady] = useState(false);
   const [role, setRole] = useState<"patient" | "family" | null>(null);
   const [caringFor, setCaringFor] = useState<CaringFor[]>([]);
   const [selected, setSelected] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    if (!isSignedIn) return;
     fetch("/api/profile")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
@@ -23,13 +24,11 @@ export default function AuthedReminders() {
         setCaringFor(d.caringFor || []);
         if (d.role === "family" && d.caringFor?.[0]) setSelected(d.caringFor[0].patientId);
       })
-      .catch(() => {});
-  }, [isSignedIn]);
+      .catch(() => {})
+      .finally(() => setReady(true));
+  }, []);
 
-  if (!isLoaded) return <main className="wrap" />;
-
-  // Signed out → still usable in local mode, with a nudge to sign in.
-  if (!isSignedIn) return <RemindersView signedIn={false} />;
+  if (!ready) return <main className="wrap" />;
 
   if (role === "family") {
     if (caringFor.length === 0) {
@@ -72,7 +71,6 @@ export default function AuthedReminders() {
           </div>
         )}
         <RemindersView
-          signedIn
           patientId={current.patientId}
           readOnlyHint={`Managing ${current.name || current.code}'s reminders`}
         />
@@ -80,6 +78,6 @@ export default function AuthedReminders() {
     );
   }
 
-  // Patient (default) → their own list.
-  return <RemindersView signedIn />;
+  // Patient (default) or local-only → their own list.
+  return <RemindersView />;
 }

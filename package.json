@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "icons": "node scripts/gen-icons.mjs"
+    "icons": "node scripts/gen-icons.mjs",
+    "gen-vapid": "web-push generate-vapid-keys"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.5.1",
@@ -16,12 +17,14 @@
     "eslint-config-next": "^15.5.19",
     "next": "^15.5.19",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@types/node": "22.10.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@types/web-push": "^3.6.4",
     "sharp": "0.33.5",
     "typescript": "5.7.2"
   }

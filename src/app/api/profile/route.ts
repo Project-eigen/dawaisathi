@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authEnabled } from "@/lib/config";
 import { dbConfigured, ensureSchema, getSql, makePatientCode } from "@/lib/db";
-import { getUserId } from "@/lib/server-auth";
+import { ensureActor } from "@/lib/actor";
 
 export const runtime = "nodejs";
 
 function preflight() {
-  if (!authEnabled) return NextResponse.json({ error: "auth_disabled" }, { status: 503 });
   if (!dbConfigured) return NextResponse.json({ error: "db_disabled" }, { status: 503 });
   return null;
 }
@@ -45,8 +43,7 @@ async function loadProfile(userId: string) {
 export async function GET() {
   const pf = preflight();
   if (pf) return pf;
-  const userId = await getUserId();
-  if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const userId = (await ensureActor()).id;
 
   const { profile, links } = await loadProfile(userId);
   return NextResponse.json({
@@ -64,8 +61,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const pf = preflight();
   if (pf) return pf;
-  const userId = await getUserId();
-  if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const userId = (await ensureActor()).id;
 
   const body = await req.json().catch(() => ({}));
   const role: Role = body.role === "family" ? "family" : "patient";

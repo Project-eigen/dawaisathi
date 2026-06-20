@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authEnabled } from "@/lib/config";
 import { dbConfigured, ensureSchema, getSql } from "@/lib/db";
-import { getUserId } from "@/lib/server-auth";
+import { ensureActor } from "@/lib/actor";
 
 export const runtime = "nodejs";
 
 // Family member links to a patient using the patient's share code.
 export async function POST(req: NextRequest) {
-  if (!authEnabled) return NextResponse.json({ error: "auth_disabled" }, { status: 503 });
   if (!dbConfigured) return NextResponse.json({ error: "db_disabled" }, { status: 503 });
 
-  const userId = await getUserId();
-  if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const userId = (await ensureActor()).id;
 
   const body = await req.json().catch(() => ({}));
   const code = (body.code || "").toString().trim().toUpperCase();
@@ -41,10 +38,8 @@ export async function POST(req: NextRequest) {
 
 // Unlink.
 export async function DELETE(req: NextRequest) {
-  if (!authEnabled) return NextResponse.json({ error: "auth_disabled" }, { status: 503 });
   if (!dbConfigured) return NextResponse.json({ error: "db_disabled" }, { status: 503 });
-  const userId = await getUserId();
-  if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const userId = (await ensureActor()).id;
 
   const patientId = new URL(req.url).searchParams.get("patientId");
   if (!patientId) return NextResponse.json({ error: "Missing patientId." }, { status: 400 });

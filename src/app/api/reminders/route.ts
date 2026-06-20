@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authEnabled } from "@/lib/config";
 import { dbConfigured, ensureSchema, getSql } from "@/lib/db";
-import { getUserId } from "@/lib/server-auth";
+import { ensureActor } from "@/lib/actor";
 
 export const runtime = "nodejs";
 
 function gate() {
-  if (!authEnabled) return NextResponse.json({ error: "auth_disabled" }, { status: 503 });
   if (!dbConfigured) return NextResponse.json({ error: "db_disabled" }, { status: 503 });
   return null;
 }
@@ -24,8 +22,7 @@ async function canAccess(userId: string, patientId: string) {
 export async function GET(req: NextRequest) {
   const g = gate();
   if (g) return g;
-  const userId = await getUserId();
-  if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const userId = (await ensureActor()).id;
 
   await ensureSchema();
   const patientId = new URL(req.url).searchParams.get("patientId") || userId;
@@ -43,8 +40,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const g = gate();
   if (g) return g;
-  const userId = await getUserId();
-  if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const userId = (await ensureActor()).id;
 
   await ensureSchema();
   const body = await req.json().catch(() => ({}));
@@ -55,12 +51,13 @@ export async function POST(req: NextRequest) {
   const name = (body.name || "").toString().trim();
   if (!name) return NextResponse.json({ error: "Medicine name is required." }, { status: 400 });
   const times: string[] = Array.isArray(body.times) ? body.times.map(String) : [];
+  const tz = (body.tz || "UTC").toString();
 
   const sql = getSql();
   const rows = await sql`
-    INSERT INTO reminders (patient_id, name, strength, frequency, times, timing, notes, created_by)
+    INSERT INTO reminders (patient_id, name, strength, frequency, times, timing, notes, tz, created_by)
     VALUES (${patientId}, ${name}, ${body.strength || ""}, ${body.frequency || ""},
-            ${times}, ${body.timing || ""}, ${body.notes || ""}, ${userId})
+            ${times}, ${body.timing || ""}, ${body.notes || ""}, ${tz}, ${userId})
     RETURNING id, patient_id, name, strength, frequency, times, timing, notes, active
   `;
   return NextResponse.json({ reminder: rows[0] });
@@ -69,8 +66,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const g = gate();
   if (g) return g;
-  const userId = await getUserId();
-  if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const userId = (await ensureActor()).id;
 
   await ensureSchema();
   const id = new URL(req.url).searchParams.get("id");
@@ -102,8 +98,7 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const g = gate();
   if (g) return g;
-  const userId = await getUserId();
-  if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const userId = (await ensureActor()).id;
 
   await ensureSchema();
   const id = new URL(req.url).searchParams.get("id");

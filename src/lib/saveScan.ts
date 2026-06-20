@@ -21,12 +21,19 @@ export async function saveScanToReminders(meds: ScanMed[]): Promise<"cloud" | "l
     cloud = false;
   }
 
+  let tz = "UTC";
+  try {
+    tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    /* keep UTC */
+  }
+
   if (cloud) {
     for (const m of meds) {
       await fetch("/api/reminders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...m, times: [] }),
+        body: JSON.stringify({ ...m, times: [], tz }),
       });
     }
     return "cloud";

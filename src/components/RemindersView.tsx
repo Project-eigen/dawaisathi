@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useReminders } from "@/lib/useReminders";
-import { checkDue, requestNotificationPermission, type Reminder } from "@/lib/notify";
+import {
+  checkDue,
+  deviceTz,
+  requestNotificationPermission,
+  subscribeToPush,
+  type Reminder,
+} from "@/lib/notify";
 
 const PRESETS: { label: string; time: string }[] = [
   { label: "Morning", time: "08:00" },
@@ -11,15 +17,13 @@ const PRESETS: { label: string; time: string }[] = [
 ];
 
 export default function RemindersView({
-  signedIn,
   patientId,
   readOnlyHint,
 }: {
-  signedIn: boolean;
   patientId?: string;
   readOnlyHint?: string;
 }) {
-  const { mode, reminders, dbMissing, add, update, remove } = useReminders({ signedIn, patientId });
+  const { mode, reminders, add, update, remove } = useReminders({ patientId });
   const [perm, setPerm] = useState<NotificationPermission>("default");
 
   // Draft for the add form.
@@ -44,7 +48,13 @@ export default function RemindersView({
     return () => clearInterval(id);
   }, []);
 
-  const enable = async () => setPerm(await requestNotificationPermission());
+  const enable = async () => {
+    const p = await requestNotificationPermission();
+    setPerm(p);
+    // In cloud mode (user or guest, DB connected) register for server push so
+    // reminders fire even with the app closed (delivered by the cron job).
+    if (p === "granted" && mode === "cloud") subscribeToPush();
+  };
 
   const addTime = (t: string) => {
     if (t && !times.includes(t)) setTimes((p) => [...p, t].sort());
@@ -52,7 +62,7 @@ export default function RemindersView({
 
   const submit = async () => {
     if (!name.trim()) return;
-    await add({ name: name.trim(), strength, frequency, timing, times, notes: "" });
+    await add({ name: name.trim(), strength, frequency, timing, times, notes: "", tz: deviceTz() });
     setName("");
     setStrength("");
     setFrequency("");
@@ -72,22 +82,16 @@ export default function RemindersView({
         </div>
       </header>
 
-      {mode === "local" && signedIn && dbMissing && (
-        <div className="banner warn" style={{ marginBottom: 12 }}>
-          <span>☁️</span>
-          <span>Saved on this device only. Connect the database to sync &amp; share with family.</span>
-        </div>
-      )}
-      {mode === "local" && !signedIn && (
+      {mode === "local" && (
         <div className="banner warn" style={{ marginBottom: 12 }}>
           <span>📱</span>
-          <span>Saved on this device. Sign in (Account tab) to sync across devices and share with family.</span>
+          <span>Saved on this device only — not backed up. Sign in from the Account tab to keep these safe and share with family.</span>
         </div>
       )}
       {mode === "cloud" && (
         <div className="banner ok" style={{ marginBottom: 12 }}>
           <span>☁️</span>
-          <span>Synced — a linked family member can see this list.</span>
+          <span>Saved to your account — synced across devices and shareable with family.</span>
         </div>
       )}
 
